@@ -20,20 +20,21 @@ client = TelegramClient('tg', api_id, api_hash)
 
 
 class UserConfig:
-    boss = boss_id
+    boss = [boss_id]
     enemy = []
-    said = []
     delay = (2,7)
     active = True
     replied= True
     sleep_task = None
+    sens = []
 user1 = UserConfig()
 
 
 @client.on(events.NewMessage())
 async def handler(event):
     if user1.active:
-        sender = event.sender_id
+        sender = int(event.sender_id)
+        if sender in user1.boss: return 
         if sender in user1.enemy and eval("event.is_reply if user1.replied else True"):
             async with client.action(event.chat_id, 'typing'):
                 delay = user1.delay
@@ -46,11 +47,12 @@ async def handler(event):
 async def add_enemy(event):
     if not authorize(event): return
 
-    id = await get_id(event, d=True)
+    user = await get_id(event, d=True)
+    id = int(user.id)
     try:
         if id in user1.enemy:
             raise ValueError
-        if not id or id == user1.boss:
+        if not id or id in user1.boss:
             raise Exception
 
         user1.enemy.append(id)
@@ -65,7 +67,8 @@ async def add_enemy(event):
 async def add_enemy(event):
     if not authorize(event): return
        
-    id = await get_id(event, d=True)
+    user = await get_id(event, d=True)
+    id = int(user.id)
     try:
         if id not in user1.enemy:
             raise ValueError
@@ -76,23 +79,6 @@ async def add_enemy(event):
         await event.respond(f"User does not exist in the Enemy List")
     except Exception:
         await event.respond(f"Couldn't delete user.")
-
-
-@client.on(events.NewMessage(pattern=r"/get(\s*(.+))?"))
-async def get(event, d=False):
-    if not authorize(event): return
-    id = event.pattern_match.group(1)
-    if id: id = id.strip()
-    if event.is_reply:
-        msg = await event.get_reply_message()
-        user = await msg.get_sender()
-        id = user.id
-    elif not id.isdigit():
-        user = await client.get_entity(id)
-        id = user.id
-    else:
-        id = int(id)
-    await event.reply(f"[{id}](tg://user?id={id})")
 
 
 @client.on(events.NewMessage(pattern=r"/getinfo\s*(@?\w+)?"))
@@ -120,7 +106,7 @@ async def get_id(event, d=False):
 
         user = await client.get_entity(id)
         if d:
-            return int(user.id)
+            return user
         await event.reply(f"User: `{user.first_name} {user.last_name or ""}`\nID: `{user.id}`\nUsername: {f"@{user.username}" if user.username else f"[{user.first_name}](tg://user?id={user.id})"}\nPhone Number: {f"+{user.phone}" if user.phone else "Hiden"}\n"
                         f"Self: {user.is_self}\nPremium: {user.premium}\nVerified: {user.verified}\nRestricted: {user.restricted}  | Reason: {user.restriction_reason or "None"}\nStatus: {type(user.status).__name__}\nLanguage: {user.lang_code or "Not specified"}", parse_mode='md')
     except Exception as e:
@@ -131,7 +117,7 @@ async def get_id(event, d=False):
 @client.on(events.NewMessage(pattern='/enemies'))
 async def list_enemies(event):
     if authorize(event):
-        await event.respond("Enemies:\n" + "\n".join(str(e) for e in user1.enemy))
+        await event.respond(f"Enemies list:\n{'\n'.join(list(map(lambda usrid: f"- [{usrid}](tg://user?id={usrid})", user1.enemy)))}")
 
 
 @client.on(events.NewMessage(pattern="/forcerep"))
@@ -159,12 +145,6 @@ async def set_time(event):
         await event.reply(f"Delay Deactivated")
 
 
-@client.on(events.NewMessage(pattern=r"/sp"))
-async def sp(event):
-    if not authorize(event): return
-    cnt = await client.get_entity("+989214874635")
-    print(cnt)
-
 @client.on(events.NewMessage(pattern=r"/spam (\d+)"))
 async def spaming(event):
     if not authorize(event): return
@@ -188,7 +168,7 @@ async def spaming(event):
 async def reset(event):
     if not authorize(event): return
 
-    user1.boss = boss_id
+    user1.boss = [boss_id]
     user1.enemy = []
     user1.said = []
     user1.delay = (2,7)
@@ -233,16 +213,43 @@ async def wake(event):
         await event.reply("Running Already")
 
 
-@client.on(events.NewMessage(pattern=r"/ccmd\s*(@?\w+)?"))
-async def ccmd(event):
+@client.on(events.NewMessage(pattern=r"/dcmd\s*(@?\w+)?"))
+async def dcmd(event):
     if not authorize(event): return
 
-    newid = await get_id(event, d=True)
-    if newid:
-        user1.boss = newid
-        await event.respond(f"Commander changed to ID: [{user1.boss}]")
-    else:
-        await event.respond(f"User ID: [{user1.boss}] is the corrent Commander.")
+    user = await get_id(event, d=True)
+    if not user: return
+
+    id = int(user.id)
+    if int(event.sender_id) != boss_id: return await event.respond("Permission denied.")
+    if id == boss_id: return await event.respond("Commander can't be dismissed")
+    if id not in user1.boss: return await event.respond("User is not a commander")
+
+    user1.boss.remove(id)
+    await event.respond(f"Commander Deleted:\nName: {f"[{user.first_name}](tg://user?id={user.id})"}\nID: {user.id}")
+
+
+@client.on(events.NewMessage(pattern=r"/cmds\s*(@?\w+)?"))
+async def acmd(event):
+    if not authorize(event): return
+    await event.respond(f"Commanders list:\n{'\n'.join(list(map(lambda usrid: f"- [{usrid}](tg://user?id={usrid})", user1.boss)))}")
+
+
+@client.on(events.NewMessage(pattern=r"/acmd\s*(@?\w+)?"))
+async def acmd(event):
+    if not authorize(event): return
+
+    user = await get_id(event, d=True)
+    if not user: return
+
+    id = int(user.id)
+    if int(event.sender_id) != boss_id: return await event.respond("Permission denied")
+    if id in user1.enemy: return await event.respond("User is a enemy")
+    if id in user1.boss: return await event.respond("User is already a commnader")
+
+    user1.boss.append(id)
+    await event.respond(f"New Commander added:\nName: {f"[{user.first_name}](tg://user?id={user.id})"}\nID: {user.id}")
+
 
 
 @client.on(events.NewMessage(pattern="/kill"))
@@ -325,7 +332,7 @@ async def help(event):
         await event.respond("Commands:\n/add [ username | ID | reply | tag ] - Add an enemy.\n/del [ username | ID | reply | tag ] - Remove an enemy.\n/enemies - Show the list of all enemies.\n/spam [num] - Repeatedly repost the replied-to message a specified number of times.\n"
         "/forcerep - Toggle Reply Mode\n/settime [off | n-m] - Schedule a delay interval\n/sleep [time]:optional - Toggle Sleep Mode\n/run - Verify system status or Cancel Sleep Mode\n/kill - Shut Down the system permanently\n/reset - Reset all settings to default\n"
         "/save [ message link | reply ] - Archive a message\n/cvm -  Convert the replied message into a video note\n/rep [message link] [ message link | reply ]:optional - Reply to a message(first-parameter) with a message(second-parameter or reply)\n"
-        "/getinfo [ username | ID | reply | tag ] - Retrieve user information.\n/ccmd [ username | ID | reply | tag ]:optional - Transfer Commander role to another user or show the current Commander.\n/cleanup [group username] [limit]:optional [offset(use \" - \" from oldest)]:optional - Delete messages in a specific group.\nNote: Due to Telegram policy and the risk of Floodwait, the deletion limit is set to 2000 by default.\n"
+        "/getinfo [ username | ID | reply | tag ] - Retrieve user information.\n/acmd [ username | ID | reply | tag ]:optional - Add Commander role to a user or show the current Commander.\n/cleanup [group username] [limit]:optional [offset(use \" - \" from oldest)]:optional - Delete messages in a specific group.\nNote: Due to Telegram policy and the risk of Floodwait, the deletion limit is set to 2000 by default.\n"
         "/backup [chat ID]:optional - Back Up from all of the Chanels, Groups, Chats and Bots, or from specific chat messages, (Updating...)\n/help - Commands guide", parse_mode='md')
 
 
@@ -519,7 +526,7 @@ def clean_files(*paths):
 # load sentences
 def load_sens():
     lst = []
-    with open("sens.csv" , 'r', encoding='utf-8') as f:
+    with open(r"D:\u\prog\Python\attacker\sens.csv" , 'r', encoding='utf-8') as f:
         for row in csv.reader(f):
             lst.append(''.join(row))
     return lst
@@ -532,15 +539,10 @@ def log_error(error):
 
 # Randomly choose a sentence
 def choose():
-    sens = load_sens()
-    while True:
-        w = choice(sens)
-        if w not in user1.said:
-            user1.said.append(w)
-            return w
+    if len(user1.sens) == 0: user1.sens = load_sens()
+    w = user1.sens.pop(0)
+    return w
 
-        if len(user1.said) == len(sens):
-            user1.said = []
 
 async def sleep_timer(timer, event):
     try:
@@ -554,8 +556,8 @@ async def sleep_timer(timer, event):
 
 def authorize(event, opt=False):
     if opt:
-        return event.sender_id == user1.boss
-    return event.sender_id == user1.boss and user1.active
+        return event.sender_id in user1.boss
+    return event.sender_id in user1.boss and user1.active
 
 
 
