@@ -25,6 +25,7 @@ class UserConfig:
     delay = (2,7)
     active = True
     replied= True
+    evil = False
     sleep_task = None
     sens = []
 user1 = UserConfig()
@@ -32,7 +33,7 @@ user1 = UserConfig()
 
 @client.on(events.NewMessage())
 async def handler(event):
-    if user1.active:
+    if user1.active and not user1.evil:
         sender = int(event.sender_id)
         if sender in user1.boss: return 
         if sender in user1.enemy and eval("event.is_reply if user1.replied else True"):
@@ -164,16 +165,52 @@ async def spaming(event):
         log_error(f"{event.text}\n{e}")
 
 
+@client.on(events.NewMessage(pattern=r"/evilmode\s*(.*)"))
+async def evil_mode(event):
+    if not authorize(event): return
+    if user1.evil:
+        user1.evil = False
+        await event.respond("Evil mode Deactivated")
+        return
+    user1.evil = True
+    await event.respond("Evil mode Activated")
+
+    try:
+        # Handle different URL formats
+        link = event.pattern_match.group(1)
+        if link:
+            chat_id = link.split('/')[-2]
+            if chat_id.isdigit(): chat_id = int(chat_id)
+        else:
+            chat_id = event.chat_id
+    
+        entity = await client.get_entity(chat_id)
+
+    except Exception as e:
+        await event.reply("Failed finding entity")
+        log_error(f"{event.text}\n{e}")
+        return
+    if not user1.enemy: print(1)
+    while user1.evil and user1.enemy:
+        for enemy in user1.enemy:
+            if not user1.evil: return
+            async for msg in client.iter_messages(entity, limit=5, from_user=enemy):
+                async with client.action(event.chat_id, 'typing'):
+                    delay = user1.delay
+                    if delay != 'off': await asyncio.sleep(uniform(delay[0],delay[1]))
+                    await msg.reply(choose())
+                break
+
 @client.on(events.NewMessage(pattern="/reset"))
 async def reset(event):
     if not authorize(event): return
 
     user1.boss = [boss_id]
     user1.enemy = []
-    user1.said = []
     user1.delay = (2,7)
     user1.active = True
-    user1.replied= True
+    user1.replied = True
+    user1.evil = False
     user1.sleep_task = None
     await event.reply(f"All Setting has been reset to defaults.")
 
@@ -472,8 +509,7 @@ async def parse_message_link(link):
         message_id = int(parts[-1]) 
         # Handle different URL formats
         chat_id = parts[-2]
-        if parts[-2].isdigit():
-            chat_id = int(parts[-2])
+        if parts[-2].isdigit(): chat_id = int(parts[-2])
 
         entity = await client.get_entity(chat_id)
 
