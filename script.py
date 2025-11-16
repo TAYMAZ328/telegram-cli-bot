@@ -6,14 +6,13 @@ import csv, logging, os, subprocess, asyncio
 from random import randint, uniform
 from moviepy import VideoFileClip
 from datetime import datetime
+from dotenv import load_dotenv
 
 
-def get_token():
-    with open("token.csv", "r") as f:
-        c = csv.reader(f)
-        return list(c)[0]
-
-api_hash, api_id, boss_id = get_token()
+load_dotenv()
+api_hash = os.getenv("API_HASH")
+api_id = os.getenv("API_ID")
+boss_id = os.getenv("ADMIN_ID")
 boss_id = int(boss_id)
 
 client = TelegramClient('tg', api_id, api_hash)

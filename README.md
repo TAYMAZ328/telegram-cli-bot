@@ -45,19 +45,17 @@ pip install -r requirements.txt
 
 #### Fill in Your Credentials:
 
-Open the file named token.csv located in the project folder. Replace the placeholders with your actual Telegram API credentials:
+Create a file named .env in the project folder and add your actual Telegram API credentials in the following format:
 
 ```
-token.csv
-
-API_HASH ,API_ID, ADMIN_ID
+.env
+API_HASH=your_api_hash_here
+API_ID=your_api_id_here
+ADMIN_ID=your_numeric_admin_id
 ```
 - API_HASH: Get this from `my.telegram.org`
 - API_ID: Also available from `my.telegram.org`
 - ADMIN_ID: Your Telegram numeric user ID (not your username)
-
-- Make sure the file contains a single line with comma-separated values and no extra spaces.
-
 
 #### Run the application:
 ```bash
