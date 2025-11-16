@@ -59,5 +59,5 @@ ADMIN_ID=your_numeric_admin_id
 
 #### Run the application:
 ```bash
-python script.py
+python bot\main.py
 ```
