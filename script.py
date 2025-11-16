@@ -3,7 +3,7 @@ from telethon.tl.types import MessageEntityMentionName
 from telethon.errors import FloodWaitError
 
 import csv, logging, os, subprocess, asyncio
-from random import choice, randint, uniform
+from random import randint, uniform
 from moviepy import VideoFileClip
 from datetime import datetime
 
@@ -22,26 +22,30 @@ client = TelegramClient('tg', api_id, api_hash)
 class UserConfig:
     boss = [boss_id]
     enemy = []
+    sens = []
     delay = (2,7)
     active = True
     replied= True
     evil = False
+    lvl = [None, None, "off"]
+    last_msg = {}
     sleep_task = None
-    sens = []
 user1 = UserConfig()
 
 
 @client.on(events.NewMessage())
 async def handler(event):
-    if user1.active and not user1.evil:
-        sender = int(event.sender_id)
-        if sender in user1.boss: return 
-        if sender in user1.enemy and eval("event.is_reply if user1.replied else True"):
-            async with client.action(event.chat_id, 'typing'):
-                delay = user1.delay
-                if delay != 'off':
-                    await asyncio.sleep(uniform(delay[0],delay[1]))
-                await event.reply(choose())
+    if not user1.active: return
+    
+    sender = int(event.sender_id)
+    if sender in user1.boss or sender not in user1.enemy: return
+    user1.last_msg[sender] = event # store last msg of the enemy for evil mode use
+
+    if not user1.evil and eval("event.is_reply if user1.replied else True"):
+        async with client.action(event.chat_id, 'typing'):
+            delay = user1.delay
+            if delay != 'off': await asyncio.sleep(uniform(delay[0],delay[1]))
+            await event.reply(choose())
 
 
 @client.on(events.NewMessage(pattern=r"/add\s*(?:(.+))?"))
@@ -75,6 +79,7 @@ async def add_enemy(event):
             raise ValueError
 
         user1.enemy.remove(id)
+        del user1.last_msg[id]
         await event.respond(f"Enemy [{id}] removed.")
     except ValueError:
         await event.respond(f"User does not exist in the Enemy List")
@@ -146,6 +151,31 @@ async def set_time(event):
         await event.reply(f"Delay Deactivated")
 
 
+@client.on(events.NewMessage(pattern=r"/setlevel\s*(off|1|2|3)?"))
+async def senlevel(event):
+    if not authorize(event): return
+
+    lvl = event.pattern_match.group(1)
+    if not lvl: return await event.reply(f"Level is set to [ {user1.lvl[2]} ]")
+
+    try:
+        if lvl == "off":
+            user1.lvl = [None, None, "off"]
+        elif lvl == "1":
+            user1.lvl = [None, 60, "1"]
+        elif lvl == "2":
+            user1.lvl = [60, 130, "2"]
+        elif lvl == "3":
+            user1.lvl = [130, None, "3"]
+
+        user1.sens.clear()
+        await event.reply(f"Level set to {lvl}")
+
+    except Exception as e:
+        await event.reply("Failed to set level")
+        log_error(f"{event.text}\n{e}")
+
+
 @client.on(events.NewMessage(pattern=r"/spam (\d+)"))
 async def spaming(event):
     if not authorize(event): return
@@ -165,9 +195,10 @@ async def spaming(event):
         log_error(f"{event.text}\n{e}")
 
 
-@client.on(events.NewMessage(pattern=r"/evilmode\s*(.*)"))
+@client.on(events.NewMessage(pattern="/evilmode"))
 async def evil_mode(event):
     if not authorize(event): return
+    
     if user1.evil:
         user1.evil = False
         await event.respond("Evil mode Deactivated")
@@ -175,31 +206,23 @@ async def evil_mode(event):
     user1.evil = True
     await event.respond("Evil mode Activated")
 
-    try:
-        # Handle different URL formats
-        link = event.pattern_match.group(1)
-        if link:
-            chat_id = link.split('/')[-2]
-            if chat_id.isdigit(): chat_id = int(chat_id)
+    async with client.action(event.chat_id, 'typing'):
+        while user1.evil and user1.enemy:
+            for enemy in user1.enemy:
+                msg = user1.last_msg.get(enemy, None)
+                if not user1.last_msg:
+                    await event.respond("Last message couldn't be retrieved")
+                    if user1.evil: await evil_mode(event)
+                    return
+                if not msg: break
+                delay = user1.delay
+                if delay != 'off': await asyncio.sleep(uniform(delay[0],delay[1]))
+                await msg.reply(choose())
         else:
-            chat_id = event.chat_id
-    
-        entity = await client.get_entity(chat_id)
+            if not user1.enemy: await event.reply("No enemy")
 
-    except Exception as e:
-        await event.reply("Failed finding entity")
-        log_error(f"{event.text}\n{e}")
-        return
-    if not user1.enemy: print(1)
-    while user1.evil and user1.enemy:
-        for enemy in user1.enemy:
-            if not user1.evil: return
-            async for msg in client.iter_messages(entity, limit=5, from_user=enemy):
-                async with client.action(event.chat_id, 'typing'):
-                    delay = user1.delay
-                    if delay != 'off': await asyncio.sleep(uniform(delay[0],delay[1]))
-                    await msg.reply(choose())
-                break
+    if user1.evil: await evil_mode(event)
+
 
 @client.on(events.NewMessage(pattern="/reset"))
 async def reset(event):
@@ -207,10 +230,13 @@ async def reset(event):
 
     user1.boss = [boss_id]
     user1.enemy = []
+    user1.sens = []
     user1.delay = (2,7)
     user1.active = True
     user1.replied = True
     user1.evil = False
+    user1.lvl = [None, None, "off"]
+    user1.last_msg = {}
     user1.sleep_task = None
     await event.reply(f"All Setting has been reset to defaults.")
 
@@ -258,9 +284,9 @@ async def dcmd(event):
     if not user: return
 
     id = int(user.id)
-    if int(event.sender_id) != boss_id: return await event.respond("Permission denied.")
-    if id == boss_id: return await event.respond("Commander can't be dismissed")
-    if id not in user1.boss: return await event.respond("User is not a commander")
+    if int(event.sender_id) != boss_id: return await event.reply("Permission denied.")
+    if id == boss_id: return await event.reply("Commander can't be dismissed")
+    if id not in user1.boss: return await event.reply("User is not a commander")
 
     user1.boss.remove(id)
     await event.respond(f"Commander Deleted:\nName: {f"[{user.first_name}](tg://user?id={user.id})"}\nID: {user.id}")
@@ -280,9 +306,9 @@ async def acmd(event):
     if not user: return
 
     id = int(user.id)
-    if int(event.sender_id) != boss_id: return await event.respond("Permission denied")
-    if id in user1.enemy: return await event.respond("User is a enemy")
-    if id in user1.boss: return await event.respond("User is already a commnader")
+    if int(event.sender_id) != boss_id: return await event.reply("Permission denied")
+    if id in user1.enemy: return await event.reply("User is a enemy")
+    if id in user1.boss: return await event.reply("User is already a commnader")
 
     user1.boss.append(id)
     await event.respond(f"New Commander added:\nName: {f"[{user.first_name}](tg://user?id={user.id})"}\nID: {user.id}")
@@ -366,11 +392,27 @@ async def cleanup(event):
 @client.on(events.NewMessage(pattern="/help"))
 async def help(event):
     if authorize(event):
-        await event.respond("Commands:\n/add [ username | ID | reply | tag ] - Add an enemy.\n/del [ username | ID | reply | tag ] - Remove an enemy.\n/enemies - Show the list of all enemies.\n/spam [num] - Repeatedly repost the replied-to message a specified number of times.\n"
-        "/forcerep - Toggle Reply Mode\n/settime [off | n-m] - Schedule a delay interval\n/sleep [time]:optional - Toggle Sleep Mode\n/run - Verify system status or Cancel Sleep Mode\n/kill - Shut Down the system permanently\n/reset - Reset all settings to default\n"
-        "/save [ message link | reply ] - Archive a message\n/cvm -  Convert the replied message into a video note\n/rep [message link] [ message link | reply ]:optional - Reply to a message(first-parameter) with a message(second-parameter or reply)\n"
-        "/getinfo [ username | ID | reply | tag ] - Retrieve user information.\n/acmd [ username | ID | reply | tag ]:optional - Add Commander role to a user or show the current Commander.\n/cleanup [group username] [limit]:optional [offset(use \" - \" from oldest)]:optional - Delete messages in a specific group.\nNote: Due to Telegram policy and the risk of Floodwait, the deletion limit is set to 2000 by default.\n"
-        "/backup [chat ID]:optional - Back Up from all of the Chanels, Groups, Chats and Bots, or from specific chat messages, (Updating...)\n/help - Commands guide", parse_mode='md')
+        await event.respond("""Commands:
+/add [ username | ID | reply | tag ] - Add an enemy.
+/del [ username | ID | reply | tag ] - Remove an enemy.
+/enemies - Show the list of all enemies.
+/spam [num] - Repeatedly repost the replied-to message a specified number of times.
+/forcerep - Toggle Reply Mode
+/settime [off | n-m] - Schedule a delay interval
+/sleep [time]:optional - Toggle Sleep Mode
+/run - Verify system status or Cancel Sleep Mode
+/kill - Shut Down the system permanently
+/reset - Reset all settings to default
+/save [ message link | reply ] - Archive a message
+/cvm -  Convert the replied message into a video note
+/rep [message link] [ message link | reply ]:optional - Reply to a message(first-parameter) with a message(second-parameter or reply)
+/getinfo [ username | ID | reply | tag ] - Retrieve user information.
+/acmd [ username | ID | reply | tag ]:optional - Add Commander role to a user or show the current Commander.
+/cleanup [group username] [limit]:optional [offset(use \" - \" from oldest)]:optional - Delete messages in a specific group.
+Note: Due to Telegram policy and the risk of Floodwait, the deletion limit is set to 2000 by default.
+/backup [chat ID]:optional - Back Up from all of the Chanels, Groups, Chats and Bots, or from specific chat messages, (Updating...)
+/help - Commands guide
+""", parse_mode='md')
 
 
 @client.on(events.NewMessage(pattern='/cvm'))
@@ -491,7 +533,6 @@ def get_type(message):
     else: return "file"
 
 async def private(event):
-    print(1)
     user = event.pattern_match.group(1)
     if user.isdigit(): user = int(user)
 
@@ -565,7 +606,7 @@ def load_sens():
     with open(r"D:\u\prog\Python\attacker\sens.csv" , 'r', encoding='utf-8') as f:
         for row in csv.reader(f):
             lst.append(''.join(row))
-    return lst
+    return lst[user1.lvl[0] : user1.lvl[1]]
 
 def log_error(error):
     date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -576,7 +617,7 @@ def log_error(error):
 # Randomly choose a sentence
 def choose():
     if len(user1.sens) == 0: user1.sens = load_sens()
-    w = user1.sens.pop(0)
+    w = user1.sens.pop(randint(0, len(user1.sens)-1))
     return w
 
 
