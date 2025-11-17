@@ -3,8 +3,8 @@ from telethon.errors import FloodWaitError
 from random import randint, uniform
 import asyncio
 
+from util import authorize, parse_message_link, log_error
 from script import client
-from util import parse_message_link, authorize, log_error
 
 
 @client.on(events.NewMessage(pattern=r"/cleanup\s+(https://t\.me/[^\s]+)\s*(\d+)?\s*(\d+)?"))
@@ -20,8 +20,7 @@ async def cleanup(event):
         report = await event.reply(f"Starting cleanup")
         try:
             msg = await parse_message_link(link)
-            if not msg:
-                raise Exception("Message Not Found")
+            if not msg: return await event.reply("Message not found")
             entity = await msg.get_chat()
         except Exception as e:
             await event.reply(f"Error resolving entity: {str(e)}")
@@ -43,7 +42,7 @@ async def cleanup(event):
                     total_deleted += len(message_batch)
                     message_batch = []
 
-                    delay = uniform(5,15)
+                    delay = uniform(5, 15)
                     await report.edit(f"Deleted {total_deleted}, Scanned {delete_count} messages so far. Waiting {delay:04.1f} secs...")
                     await asyncio.sleep(delay)
 
@@ -62,5 +61,5 @@ async def cleanup(event):
             await report.edit(f"Clean up completed. Deleted {total_deleted} out of {delete_count} scanned.")
 
     except Exception as e:
-        await event.reply(f"Cleanup Error: {str(e)}")
-        log_error(f"{event.text}\n{e}")
+        log_error(f"Error cleanup: {event.text}\n{e}")
+        await event.reply(f"Cleanup failure: {str(e)}")

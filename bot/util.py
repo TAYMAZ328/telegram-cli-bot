@@ -17,7 +17,7 @@ async def parse_message_link(link):
 
         return await client.get_messages(entity, ids=message_id)
     except Exception as e:
-        log_error(f"Error parsing link {link}:\n{e}")
+        log_error(f"Error parsing link: {link}\n{e}")
         return
     
 
@@ -43,14 +43,14 @@ def clean_files(*paths):
 # load sentences
 def load_sens():
     lst = []
-    with open(os.path.join("telegram-cli-bot", "files", "users.csv") , 'r', encoding='utf-8') as f:
+    with open(os.path.join("files", "users.csv") , 'r', encoding='utf-8') as f:
         for row in csv.reader(f):
             lst.append(''.join(row))
     return lst[user1.lvl[0] : user1.lvl[1]]
 
 def log_error(error):
     date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(os.path.join("telegram-cli-bot", "files", "errors.log"), "a") as f:
+    with open(os.path.join("files", "errors.log"), "a") as f:
         f.write(f"[{date}]\n{error}\n")
     logging.error(error)
 

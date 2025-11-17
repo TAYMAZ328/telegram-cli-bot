@@ -1,8 +1,8 @@
 from telethon import events
 
-from script import client
 from util import authorize, parse_message_link, log_error, clean_files
 from cvm import convert_to_video_note
+from script import client
 
 @client.on(events.NewMessage(pattern=r"/save\s*(@\w+|\d+|https://t\.me/[^\s]+)?(\s+(\d+))?"))
 async def save_message(event):
@@ -51,16 +51,20 @@ async def save_message(event):
 
     except Exception as e:
         await event.reply(f"Saving Error: {str(e)}")
-        log_error(f"{event.text}\n{e}")
+        log_error(f"Error saving: {event.text}\n{e}")
 
 
 async def private(event):
-    user = event.pattern_match.group(1)
-    if user.isdigit(): user = int(user)
+    try:
+        user = event.pattern_match.group(1)
+        if user.isdigit(): user = int(user)
 
-    lim = event.pattern_match.group(2)
-    lim = int(lim) if lim else 5
+        lim = event.pattern_match.group(2)
+        lim = int(lim) if lim else 5
 
-    messages = await client.get_messages(user, limit=lim)
-    msg_list = [msg for msg in messages if msg.media]
-    return msg_list
+        messages = await client.get_messages(user, limit=lim)
+        msg_list = [msg for msg in messages if msg.media]
+        return msg_list
+
+    except Exception as e:
+        log_error(f"Error fetching messages from chat: {event.text}\n{e}")

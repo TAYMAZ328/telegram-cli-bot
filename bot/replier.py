@@ -1,8 +1,8 @@
 from telethon import events
 
-from script import client
 from util import authorize, parse_message_link, get_type, log_error, clean_files
 from cvm import convert_to_video_note
+from script import client
 
 
 @client.on(events.NewMessage(pattern=r"/rep\s+(https://t\.me/[^\s]+)(?:\s+(https://t\.me/[^\s]+))?"))
@@ -38,7 +38,7 @@ async def reply_with_message(event):
                 await client.send_message(target_msg.chat_id, rep_msg.text, reply_to=target_msg.id, link_preview=False)
 
     except Exception as e:
-        await event.reply(f"Reply Error: {e}")
-        log_error(f"{event.text}\n{e}")
+        await event.reply("Failed to reply")
+        log_error(f"Error reply: {event.text}\n{e}")
     finally:
         clean_files(input_path, output_path)
