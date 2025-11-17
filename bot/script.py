@@ -9,12 +9,12 @@ from config import boss_id, user1
 
 
 
-
 load_dotenv()
 api_hash = os.getenv("API_HASH")
 api_id = os.getenv("API_ID")
 
 client = TelegramClient('tg', api_id, api_hash)
+
 
 @client.on(events.NewMessage(pattern=r"/getinfo\s*(@?\w+)?"))
 async def get_id(event, d=False):
@@ -22,32 +22,33 @@ async def get_id(event, d=False):
 
     try:
         par = event.pattern_match.group(1)
+        id = None
 
         if event.is_reply:
             msg = await event.get_reply_message()
             user = await msg.get_sender()
             id = user.id
+
         elif event.message.entities:
             for entity in event.message.entities:
                 if isinstance(entity, MessageEntityMentionName):
                     id = entity.user_id
                     break
-                elif par and "@" in par:
-                    id = par
-                elif par and par.isdigit():
-                    id = int(par)
-                else:
-                    return
+
+        if not id:
+            if par and par.startswith("@"): id = par
+            elif par and par.isdigit(): id = int(par)
+            else: return await event.reply("No valid user found")
 
         user = await client.get_entity(id)
-        if d:
-            return user
+        if d: return user
+
         await event.reply(f"User: `{user.first_name} {user.last_name or ""}`\nID: `{user.id}`\nUsername: {f"@{user.username}" if user.username else f"[{user.first_name}](tg://user?id={user.id})"}\nPhone Number: {f"+{user.phone}" if user.phone else "Hiden"}\n"
                         f"Self: {user.is_self}\nPremium: {user.premium}\nVerified: {user.verified}\nRestricted: {user.restricted}  | Reason: {user.restriction_reason or "None"}\nStatus: {type(user.status).__name__}\nLanguage: {user.lang_code or "Not specified"}", parse_mode='md')
+    
     except Exception as e:
-        await event.reply("Couldn't find any user")
-        log_error(f"{event.text}\n{e}")
-
+        log_error(f"{event.text}\n{e}") 
+        await event.reply("Couldn't retrieve user info")
 
 
 @client.on(events.NewMessage(pattern="/reset"))
@@ -102,7 +103,6 @@ async def wake(event):
         await event.reply("Running Already")
 
 
-
 @client.on(events.NewMessage(pattern="/kill"))
 async def shutdown(event):
     if not authorize(event): return
@@ -127,7 +127,12 @@ async def help(event):
 /enemies - Show the list of all enemies.
 /spam [num] - Repeatedly repost the replied-to message a specified number of times.
 /forcerep - Toggle Reply Mode
+/evilmode - Toggle Evil Mode. When activated, the bot will automatically reply to enemies using their last message.
 /settime [off | n-m] - Schedule a delay interval
+/setlevel [off | 1 | 2 | 3] - Set the bot's intensity level, (Leave empty to check current level)
+/acmd [ username | ID | reply | tag ]:optional - Add a user as a Commander
+/dcmd [ username | ID | reply | tag ]:optional - Remove a user from the Commander list.
+/cmds - Show the list of current Commanders.
 /sleep [time]:optional - Toggle Sleep Mode
 /run - Verify system status or Cancel Sleep Mode
 /kill - Shut Down the system permanently
@@ -136,10 +141,9 @@ async def help(event):
 /cvm -  Convert the replied message into a video note
 /rep [message link] [ message link | reply ]:optional - Reply to a message(first-parameter) with a message(second-parameter or reply)
 /getinfo [ username | ID | reply | tag ] - Retrieve user information.
-/acmd [ username | ID | reply | tag ]:optional - Add Commander role to a user or show the current Commander.
 /cleanup [group username] [limit]:optional [offset(use \" - \" from oldest)]:optional - Delete messages in a specific group.
 Note: Due to Telegram policy and the risk of Floodwait, the deletion limit is set to 2000 by default.
-/backup [chat ID]:optional - Back Up from all of the Chanels, Groups, Chats and Bots, or from specific chat messages, (Updating...)
+/backup [chat ID]:optional - Back Up from all of the Channels, Groups, Chats and Bots, or from specific chat messages, (Updating...)
 /help - Commands guide
 """, parse_mode='md')
 
