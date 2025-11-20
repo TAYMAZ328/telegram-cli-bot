@@ -100,7 +100,7 @@ async def wake(event):
             user1.sleep_task.cancel()
         await event.reply("Sleep Mode Cancelled")
     else:
-        await event.reply("Running Already")
+        await event.reply("Running already")
 
 
 @client.on(events.NewMessage(pattern="/kill"))
