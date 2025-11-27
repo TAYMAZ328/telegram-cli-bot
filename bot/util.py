@@ -43,7 +43,7 @@ def clean_files(*paths):
 # load sentences
 def load_sens():
     lst = []
-    with open(os.path.join("files", "users.csv") , 'r', encoding='utf-8') as f:
+    with open(os.path.join("files", "sens.csv") , 'r', encoding='utf-8') as f:
         for row in csv.reader(f):
             lst.append(''.join(row))
     return lst[user1.lvl[0] : user1.lvl[1]]
