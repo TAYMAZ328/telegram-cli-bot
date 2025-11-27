@@ -57,7 +57,7 @@ async def del_enemy(event):
 
         user1.enemy.remove(id)
         if id in user1.last_msg: del user1.last_msg[id]
-        await event.respond(f"Enemy [[{id}](tg://user?id={id})] added.")
+        await event.respond(f"Enemy [[{id}](tg://user?id={id})] deleted.")
 
     except Exception as e:
         log_error(f"Error deleting enemy: {event.text}\n{e}")
