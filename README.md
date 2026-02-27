@@ -1,5 +1,5 @@
 # Telegram Tools Bot
-Telegram CLI Bot is a powerful, feature-rich command-line interface for Telegram automation built with Python and Telethon. It provides enterprise-grade message management.
+Telegram CLI Bot is a feature-rich command-line interface for Telegram automation built with Python and Telethon. It provides enterprise-grade message management.
 
 ## Features
 ### Auto-Reply System
